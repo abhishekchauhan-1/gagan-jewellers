@@ -1,4 +1,4 @@
-require('dotenv').config()
+require("dotenv").config();
 const express = require("express");
 const port = 8000;
 const app = express();
@@ -15,9 +15,9 @@ const passportLocal = require("./config/passport-local");
 app.use(bodyParser.json());
 
 const s3 = new AWS.S3({
-    accessKeyId: "AKIAQM53GUAH5VJCSAMN",
-    secretAccessKey: "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",
-  });
+  accessKeyId: "AKIAQM53GUAH5VJCSAMN",
+  secretAccessKey: "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",
+});
 
 app.post("/register", async (req, res) => {
   try {
@@ -48,51 +48,60 @@ app.post("/register", async (req, res) => {
   }
 });
 
-
-//This one is For Login in the App and send the URL of the images from the S
 app.post("/login", (req, res, next) => {
-    passport.authenticate("local", { session: false }, (err, user, info) => {
+  passport.authenticate("local", { session: false }, (err, user, info) => {
+    if (err) {
+      return res.status(500).json({ error: "An error occurred" });
+    }
+    if (!user) {
+      return res
+        .status(401)
+        .json({ error: "Invalid mobile number or password" });
+    }
+
+    req.login(user, { session: false }, (err) => {
       if (err) {
         return res.status(500).json({ error: "An error occurred" });
       }
-      if (!user) {
-        return res.status(401).json({ error: "Invalid mobile number or password" });
-      }
-  
-      req.login(user, { session: false }, (err) => {
+
+      // Generate and sign the JWT token
+      const token = jwt.sign({ sub: user._id }, "Agcup8057"); // Replace with your own secret key
+
+      // Fetch all the object URLs from your Amazon S3 bucket
+      const bucketName = "gagan-shivam-jewellers-v1"; // Replace with your S3 bucket name
+
+      const params = {
+        Bucket: bucketName,
+      };
+
+      s3.listObjectsV2(params, (err, data) => {
         if (err) {
+          console.error("Error retrieving object URLs:", err);
           return res.status(500).json({ error: "An error occurred" });
         }
-  
-        // Generate and sign the JWT token
-        const Token = jwt.sign({ sub: user._id }, "Agcup8057"); // Replace with your own secret key
-  
-        // Fetch all the object URLs from your Amazon S3 bucket
-        const bucketName = "gagan-shivam-jewellers-v1"; // Replace with your S3 bucket name
-  
-        const params = {
-          Bucket: bucketName,
-        };
-  
-        s3.listObjectsV2(params, (err, data) => {
-          if (err) {
-            console.error("Error retrieving object URLs:", err);
-            return res.status(500).json({ error: "An error occurred" });
-          }
-  
-          // Extract the object URLs from the S3 response
-          const objectURLs = data.Contents.map((object) => {
-            return `https://${bucketName}.s3.amazonaws.com/${object.Key}`;
-          });
-  
-          // Return the token and object URLs in the response
-          return res.json({ Token, objectURLs });
+
+        // Extract the object URLs from the S3 response
+        const objectURLs = data.Contents.map((object) => {
+          return `https://${bucketName}.s3.amazonaws.com/${object.Key}`;
         });
+
+        // Return the token, user profile data, and object URLs in the response
+        const userProfileData = {
+          fullName: user.fullName,
+          email: user.email,
+          mobileNumber: user.mobileNumber,
+          address: user.address,
+          state: user.state,
+          city: user.city,
+        };
+
+        return res.json({ token, userProfileData, objectURLs });
       });
-    })(req, res, next);
-  });
-  
-  //this one for forget Password
+    });
+  })(req, res, next);
+});
+
+//this one for forget Password
 app.put("/update-password", async (req, res) => {
   try {
     const { mobileNumber, password } = req.body;
@@ -119,9 +128,9 @@ app.put("/update-password", async (req, res) => {
   }
 });
 
-
 //this one for Change Password Inside the application
-app.put("/api/change-password",
+app.put(
+  "/api/change-password",
   passport.authenticate("jwt", { session: false }),
   async (req, res) => {
     try {
@@ -152,7 +161,6 @@ app.put("/api/change-password",
     }
   }
 );
-
 
 //For the listen from the server
 app.listen(port, function (error) {
