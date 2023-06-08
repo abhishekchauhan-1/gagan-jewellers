@@ -15,8 +15,8 @@ const passportLocal = require("./config/passport-local");
 app.use(bodyParser.json());
 
 const s3 = new AWS.S3({
-  accessKeyId: "AKIAQM53GUAH5VJCSAMN",
-  secretAccessKey: "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",
+  accessKeyId: "",
+  secretAccessKey: "",
 });
 
 app.post("/register", async (req, res) => {
